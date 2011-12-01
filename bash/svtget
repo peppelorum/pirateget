@@ -121,6 +121,10 @@ if [ "$extension" != "${tcUrl##*.}" ]; then
 	extension="flv"
 fi
 filename="$(basename $pageUrl).$extension"
+prefix="$(basename $(dirname $pageUrl))"
+if echo "$prefix" | grep -qE '[^0-9]+' ; then
+  filename="${prefix}_${filename}"
+fi
 echo Running RTMPDump for "$tcUrl" and saving to "$filename"
 
 rtmpdump -r "$tcUrl" --swfVfy="$swfUrl" -o "$filename"
