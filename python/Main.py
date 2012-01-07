@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.2
+
 # -*- coding: utf-8 -*-
 # vim:fileencoding=utf8
 # CDDL HEADER START
@@ -25,35 +25,66 @@
 # Use is subject to license terms.
 #
 
-import urllib.request
-import urllib.parse
-import io
-import json
 import os
 import sys
+import re
+import unicodedata
 
-user_input_url = str(input("URL to the stream "))
+from BeautifulSoup import BeautifulSoup
+import requests
+
+bitrate = 2400
+
+def f5(seq, idfun=None):
+# order preserving
+    if idfun is None:
+        def idfun(x): return x
+    seen = {}
+    result = []
+    for item in seq:
+        marker = idfun(item)
+        # in old Python versions:
+        # if seen.has_key(marker)
+        # but in new ones:
+        if marker in seen: continue
+        seen[marker] = 1
+        result.append(item)
+    return result
+
+def getVideo(filename, rtmp, swf):
+
+    print("Running RTMPDump on " + rtmp + " and saving it as " + filename + ".mp4")
+    print 'rtmpdump -r ' + rtmp + ' --swfVfy=' + swf + ' -o ' + filename + '.mp4'
+    os.system('rtmpdump -r ' + rtmp + ' --swfVfy=' + swf + ' -o "' + filename + '.mp4"')
+
+
+def getSwfUrl(html):
+    p = re.compile('data="([^"]+.swf)"')
+    ret = p.search(r.content)
+    if not ret:
+        raise Exception('Unable to find player swf, is URL working?')
+
+    return 'http://svtplay.se'+ ret.group().split('data="')[1].strip('"')
+
+user_input_url = raw_input('URL to SVT Play you want to download: ')
 
 if user_input_url.startswith("http://svt") is not True:
-	print("Bad URL. Not SVT Play?")
-	sys.exit()
+    print("Bad URL. Not SVT Play?")
+    sys.exit()
 
-HTTP_socket = urllib.request.urlopen("http://svtget.se/get/get.php?" + str(urllib.parse.urlencode({"url" : user_input_url}).encode('utf-8'), 'utf-8'))
-HTML_source = HTTP_socket.read().decode('utf-8')
-HTTP_socket.close()
-io = io.StringIO(HTML_source)
-json_data = json.load(io)
+r = requests.get(user_input_url)
 
-print("#	Bitrate	Filename")
+swfUrl = getSwfUrl(r.content)
 
-n=0
+soup = BeautifulSoup(r.content)
+filename = soup.find('title').text.replace(' | SVT Play', '') +' - '+ soup.findAll('h2')[0].text
 
-for tcUrl in json_data['tcUrls']:
-	print(n, "	" + tcUrl[1] + "	" + tcUrl[0])
-	n+=1
+p = re.compile('rtmp[e]?:[^|&]+,bitrate:[0-9]+')
+videos = f5(p.findall(r.content))
+for video in videos:
+    urlQuality = video.split(',bitrate:')
 
-user_input_n = int(input("Which file do you want? [#] "))
+    if int(urlQuality[1]) == bitrate:
+        filename = unicodedata.normalize('NFKD', filename).encode('ascii','ignore')
+        getVideo(filename, urlQuality[0], swfUrl)
 
-print("Running RTMPDump on " + json_data['tcUrls'][user_input_n][0] + " and saving it as " + json_data['program_name'] + ".mp4")
-
-os.system('rtmpdump -r ' + json_data['tcUrls'][user_input_n][0] + ' --swfVfy=' + json_data['swfUrl'] + ' -o ' + json_data['program_name'] + '.mp4')
