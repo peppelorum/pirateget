@@ -19,7 +19,7 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-# 
+#
 #
 # Copyright 2011 Patrik Greco All rights reserved.
 # Use is subject to license terms.
@@ -66,7 +66,12 @@ def getSwfUrl(html):
 
     return 'http://svtplay.se'+ ret.group().split('data="')[1].strip('"')
 
-user_input_url = raw_input('URL to SVT Play you want to download: ')
+if not sys.argv[1:]:
+    user_input_url = raw_input('URL to SVT Play you want to download: ')
+else:
+    user_input_url = sys.argv[1]
+
+print user_input_url
 
 if user_input_url.startswith("http://svt") is not True:
     print("Bad URL. Not SVT Play?")
@@ -81,6 +86,10 @@ filename = soup.find('title').text.replace(' | SVT Play', '') +' - '+ soup.findA
 
 p = re.compile('rtmp[e]?:[^|&]+,bitrate:[0-9]+')
 videos = f5(p.findall(r.content))
+
+if not videos:
+    print "Sorry, no downloadable content found."
+
 for video in videos:
     urlQuality = video.split(',bitrate:')
 
