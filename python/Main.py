@@ -1,90 +1,96 @@
-
 # -*- coding: utf-8 -*-
-# vim:fileencoding=utf8
-# CDDL HEADER START
 #
-# The contents of this file are subject to the terms of the
-# Common Development and Distribution License (the "License").
-# You may not use this file except in compliance with the License.
-#
-# You can obtain a copy of the license in the LICENSE.CDDL file
-# or at http://dev.sikevux.se/LICENSE.txt
-# See the License for the specific language governing permissions
-# and limitations under the License.
-#
-# When distributing Covered Code, include this CDDL HEADER in each
-# file and include the License file LICENSE.CDDL
-# If applicable, add the following below this CDDL HEADER, with the
-# fields enclosed by brackets "[]" replaced with your own identifying
-# information: Portions Copyright [yyyy] [name of copyright owner]
-#
-# CDDL HEADER END
-# 
-#
-# Copyright 2011 Patrik Greco All rights reserved.
-# Use is subject to license terms.
+# ----------------------------------------------------------------------------
+# "THE BEER-WARE LICENSE" (Revision 42):
+# <p@bergqvi.st> wrote this file. As long as you retain this notice you
+# can do whatever you want with this stuff. If we meet some day, and you think
+# this stuff is worth it, you can buy me a beer in return. Peppe Bergqvist
+# ----------------------------------------------------------------------------
 #
 
 import os
 import sys
-import re
-import unicodedata
 
 from BeautifulSoup import BeautifulSoup
 import requests
+import simplejson
+import envoy
+from optparse import OptionParser
 
-bitrate = 2400
+class Pirateget():
 
-def f5(seq, idfun=None):
-# order preserving
-    if idfun is None:
-        def idfun(x): return x
-    seen = {}
-    result = []
-    for item in seq:
-        marker = idfun(item)
-        # in old Python versions:
-        # if seen.has_key(marker)
-        # but in new ones:
-        if marker in seen: continue
-        seen[marker] = 1
-        result.append(item)
-    return result
+    def which(self, program):
+        def is_exe(fpath):
+            return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
-def getVideo(filename, rtmp, swf):
+        fpath, fname = os.path.split(program)
+        if fpath:
+            if is_exe(program):
+                return program
+        else:
+            for path in os.environ["PATH"].split(os.pathsep):
+                exe_file = os.path.join(path, program)
+                if is_exe(exe_file):
+                    return exe_file
 
-    print("Running RTMPDump on " + rtmp + " and saving it as " + filename + ".mp4")
-    print 'rtmpdump -r ' + rtmp + ' --swfVfy=' + swf + ' -o ' + filename + '.mp4'
-    os.system('rtmpdump -r ' + rtmp + ' --swfVfy=' + swf + ' -o "' + filename + '.mp4"')
+        return None
+
+    def checkReqs(self):
+        """
+        Check that ffmpeg is installed
+        """
+        if not self.which('ffmpeg'):
+            print 'ffmpeg seems not to be installed'
+            sys.exit()
+
+    def getVideo(self, url, filename):
+        command = 'ffmpeg -i \"%s\" -acodec copy -vcodec copy -absf aac_adtstoasc "%s.mp4"' % (url, filename)
+        envoy.run(command)
+
+    def sort_by_age(self, d):
+        '''a helper function for sorting'''
+        return int(d['meta']['quality'].split('x')[0])
+
+    def run(self, url, filename):
+        if url.startswith("http://svt") or url.startswith("http://www.svt") is not True:
+            print("Bad URL. Not SVT Play?")
+            sys.exit()
+
+        r = requests.get(url)
+        soup = BeautifulSoup(r.content, convertEntities=BeautifulSoup.HTML_ENTITIES)
+
+        try:
+            filename = soup.find('title').text.replace(' | SVT Play', '')
+        except:
+            filename = 'could not parse'
+
+        video = requests.get('http://pirateplay.se/api/get_streams.js?url='+ url)
+
+        json = simplejson.loads(video.content)
+        json = sorted(json, key=self.sort_by_age, reverse=True)
+        url = json[0]['url']
+
+        self.getVideo(url, filename)
 
 
-def getSwfUrl(html):
-    p = re.compile('data="([^"]+.swf)"')
-    ret = p.search(r.content)
-    if not ret:
-        raise Exception('Unable to find player swf, is URL working?')
+def main():
+    parser = OptionParser(usage="usage: %prog [options] url")
+    parser.add_option("-f", "--filename",
+                      action="store", # optional because action defaults to "store"
+                      dest="filename",
+                      default=False,
+                      help="Filename to save the MP4 to",)
+    (options, args) = parser.parse_args()
 
-    return 'http://svtplay.se'+ ret.group().split('data="')[1].strip('"')
+    if len(args) != 1:
+        parser.error("wrong number of arguments")
 
-user_input_url = raw_input('URL to SVT Play you want to download: ')
+    obj = Pirateget()
+    obj.checkReqs()
+    obj.run(args[0], options.filename)
 
-if user_input_url.startswith("http://svt") is not True:
-    print("Bad URL. Not SVT Play?")
-    sys.exit()
+    print options
+    print args
 
-r = requests.get(user_input_url)
-
-swfUrl = getSwfUrl(r.content)
-
-soup = BeautifulSoup(r.content)
-filename = soup.find('title').text.replace(' | SVT Play', '') +' - '+ soup.findAll('h2')[0].text
-
-p = re.compile('rtmp[e]?:[^|&]+,bitrate:[0-9]+')
-videos = f5(p.findall(r.content))
-for video in videos:
-    urlQuality = video.split(',bitrate:')
-
-    if int(urlQuality[1]) == bitrate:
-        filename = unicodedata.normalize('NFKD', filename).encode('ascii','ignore')
-        getVideo(filename, urlQuality[0], swfUrl)
-
+if __name__ == '__main__':
+    main()
