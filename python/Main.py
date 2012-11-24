@@ -16,6 +16,8 @@ import requests
 import simplejson
 #import envoy
 from optparse import OptionParser
+import unicodedata
+
 
 class Pirateget():
 
@@ -44,7 +46,8 @@ class Pirateget():
             sys.exit()
 
     def getVideo(self, url, filename):
-        command = 'ffmpeg -i \"%s\" -acodec copy -vcodec copy -absf aac_adtstoasc "%s.mp4"' % (url, unicode(filename))
+        filename = unicodedata.normalize('NFKD', filename).encode('ascii','ignore')
+        command = 'ffmpeg -i \"%s\" -acodec copy -vcodec copy -absf aac_adtstoasc "%s.mp4"' % (url, filename)
         os.system(command)
 #        envoy.run(command)
 
@@ -52,7 +55,7 @@ class Pirateget():
         '''a helper function for sorting'''
         return int(d['meta']['quality'].split('x')[0])
 
-    def run(self, url, filename):
+    def run(self, url, path, filename):
         if url.startswith("http://svt") or url.startswith("http://www.svt") is not True:
             print("Bad URL. Not SVT Play?")
             sys.exit()
@@ -77,6 +80,11 @@ class Pirateget():
 
 def main():
     parser = OptionParser(usage="usage: %prog [options] url")
+    parser.add_option("-p", "--path",
+                      action="store", # optional because action defaults to "store"
+                      dest="path",
+                      default=False,
+                      help="Filename to save the MP4 to",)
     parser.add_option("-f", "--filename",
                       action="store", # optional because action defaults to "store"
                       dest="filename",
@@ -89,7 +97,7 @@ def main():
 
     obj = Pirateget()
     obj.checkReqs()
-    obj.run(args[0], options.filename)
+    obj.run(args[0], options.path, options.filename)
 
     print options
     print args
