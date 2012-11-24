@@ -2,4 +2,3 @@ requests
 BeautifulSoup
 simplejson
 scriptine
-envoy
