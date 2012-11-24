@@ -69,6 +69,9 @@ class Pirateget():
             except:
                 filename = 'could not parse'
 
+        if path:
+            filename = os.path.join(path, filename)
+
         video = requests.get('http://pirateplay.se/api/get_streams.js?url='+ url)
 
         json = simplejson.loads(video.content)
@@ -84,7 +87,7 @@ def main():
                       action="store", # optional because action defaults to "store"
                       dest="path",
                       default=False,
-                      help="Filename to save the MP4 to",)
+                      help="Path to save the MP4 to",)
     parser.add_option("-f", "--filename",
                       action="store", # optional because action defaults to "store"
                       dest="filename",
