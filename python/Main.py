@@ -14,7 +14,7 @@ import sys
 from BeautifulSoup import BeautifulSoup
 import requests
 import simplejson
-import envoy
+#import envoy
 from optparse import OptionParser
 
 class Pirateget():
@@ -44,8 +44,9 @@ class Pirateget():
             sys.exit()
 
     def getVideo(self, url, filename):
-        command = 'ffmpeg -i \"%s\" -acodec copy -vcodec copy -absf aac_adtstoasc "%s.mp4"' % (url, filename)
-        envoy.run(command)
+        command = 'ffmpeg -i \"%s\" -acodec copy -vcodec copy -absf aac_adtstoasc "%s.mp4"' % (url, unicode(filename))
+        os.system(command)
+#        envoy.run(command)
 
     def sort_by_age(self, d):
         '''a helper function for sorting'''
@@ -59,10 +60,11 @@ class Pirateget():
         r = requests.get(url)
         soup = BeautifulSoup(r.content, convertEntities=BeautifulSoup.HTML_ENTITIES)
 
-        try:
-            filename = soup.find('title').text.replace(' | SVT Play', '')
-        except:
-            filename = 'could not parse'
+        if not filename:
+            try:
+                filename = soup.find('title').text.replace(' | SVT Play', '')
+            except:
+                filename = 'could not parse'
 
         video = requests.get('http://pirateplay.se/api/get_streams.js?url='+ url)
 
